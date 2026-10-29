@@ -36,3 +36,26 @@ Invoice approval demo app: ASP.NET Core 8 Web API with a small static web UI.
 
 - Commit real credentials, tokens or customer data.
 - Add business logic to `Program.cs` or controllers.
+
+## Approval limits (role-approval-limits)
+- Amounts are `decimal`; limits are inclusive and live as named constants in one place in Domain.
+- Manager: may approve alone up to 50,000. Director: alone up to 500,000.
+- Above 500,000: two approvals from two different users; the second must be a Director.
+  The first must be a Manager or Director (assumption D2).
+- The same user id can never count twice on one invoice (case-insensitive compare).
+- A rejected attempt returns a typed reason (code + message) and MUST NOT mutate the
+  invoice: status, approvals list, timestamps all unchanged.
+- Out of scope: do not invent extra rules (e.g. creator-cannot-approve).
+
+## Layering for this feature
+- Pure rule logic in Domain (`ApprovalPolicy`, no side effects); `ApprovalService` calls it
+  first and mutates only on acceptance. Controllers only map results to HTTP.
+
+## Test and review expectations
+- Tests derive from the OpenSpec scenarios, not from reading the implementation.
+- Every rule needs boundary tests (50,000 / 50,000.01 / 500,000 / 500,000.01) and an
+  "invoice unchanged" assertion after every rejection.
+- Commands: tests `dotnet test backend/InvoiceApp.sln`;
+  mutation `cd backend/tests/InvoiceApp.Tests && dotnet stryker`; e2e as above.
+- Reviews are written as JSON per `docs/ai/review-schema.json`; every finding gets a verdict
+  of fixed, dismissed (reason) or deferred (reason).
