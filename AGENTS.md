@@ -37,25 +37,43 @@ Invoice approval demo app: ASP.NET Core 8 Web API with a small static web UI.
 - Commit real credentials, tokens or customer data.
 - Add business logic to `Program.cs` or controllers.
 
-## Approval limits (role-approval-limits)
-- Amounts are `decimal`; limits are inclusive and live as named constants in one place in Domain.
-- Manager: may approve alone up to 50,000. Director: alone up to 500,000.
-- Above 500,000: two approvals from two different users; the second must be a Director.
-  The first must be a Manager or Director (assumption D2).
-- The same user id can never count twice on one invoice (case-insensitive compare).
-- A rejected attempt returns a typed reason (code + message) and MUST NOT mutate the
-  invoice: status, approvals list, timestamps all unchanged.
-- Out of scope: do not invent extra rules (e.g. creator-cannot-approve).
-
-## Layering for this feature
-- Pure rule logic in Domain (`ApprovalPolicy`, no side effects); `ApprovalService` calls it
-  first and mutates only on acceptance. Controllers only map results to HTTP.
-
-## Test and review expectations
-- Tests derive from the OpenSpec scenarios, not from reading the implementation.
-- Every rule needs boundary tests (50,000 / 50,000.01 / 500,000 / 500,000.01) and an
-  "invoice unchanged" assertion after every rejection.
-- Commands: tests `dotnet test backend/InvoiceApp.sln`;
-  mutation `cd backend/tests/InvoiceApp.Tests && dotnet stryker`; e2e as above.
-- Reviews are written as JSON per `docs/ai/review-schema.json`; every finding gets a verdict
-  of fixed, dismissed (reason) or deferred (reason).
+## Feature: approval limits by role (OpenSpec change: add-role-approval-limits)
+### Rules (amounts are decimal; limits are inclusive)
+- Manager may approve alone when Amount <= 50,000.
+- Director may approve alone when Amount <= 500,000.
+- Amount > 500,000 needs two approvals from two different users. The first approver must be a
+Manager or Director. The second approver must be a Director.
+- After the first approval of an invoice above 500,000 the invoice stays Pending with one entry in
+its approvals list. Only the second valid approval makes it Approved.
+- The same user id never counts twice on one invoice. Compare ids case-insensitively.
+- Admin and every other role cannot approve. The seeded user demo.approver becomes a Manager.
+New seeded users: demo.director and demo.director2. <adjust to recon if needed>
+- A rejected attempt returns a reason code and a human-readable message and changes NOTHING on the
+invoice: not the status, not the approvals list, not any timestamp.
+- Reason codes: NotAnApprover, ExceedsApprovalLimit, RequiresTwoApprovers (interim only),
+SameApprover, SecondApproverMustBeDirector, InvalidState (map to existing not-pending behaviour).
+- If several rejections apply, report the first of: InvalidState, NotAnApprover,
+ExceedsApprovalLimit, SameApprover, SecondApproverMustBeDirector.
+- Out of scope, do not add: creator-cannot-approve, currency, delegation, audit log, persistence.
+### Layering for this feature
+- Domain: a pure ApprovalPolicy (no I/O, no mutation) and an ApprovalService that calls the policy
+first and mutates the invoice only after the policy accepted. Limits are named constants in one
+place only.
+- API: controllers only map the result to HTTP using the existing error handling. No business rules
+in controllers.
+- UI: show the rejection message in an element with role="alert".
+### Tests
+- Unit test command: <from recon, e.g. dotnet test backend/InvoiceApp.sln>
+- E2E command: cd e2e && npm install && npx playwright install chromium && npm test
+- Tests are written from the spec scenarios, not from reading the implementation.
+- Every rule needs boundary tests at 50,000 / 50,000.01 / 500,000 / 500,000.01.
+- After every rejection a test asserts the invoice equals its snapshot from before the call.
+- Assert reason codes, not message text.
+### Review expectations
+- Every review finding has: severity, file, line, finding, suggested fix.
+- Every finding on the pull request gets one verdict: fixed (with commit), dismissed (with reason),
+or deferred (with reason and issue link).
+- Never commit code you have not read. Never claim tests pass without running them.
+### Git conventions
+- Branch: feature/role-approval-limits. One logical change per commit. The message says what
+changed and why.

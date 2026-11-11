@@ -1,0 +1,1 @@
+Phase 1 | Cold agent (A) treated demo.admin as the director-level approver and assumed both approvers arrive in one request | Compared A with the decisions D1 and D5 in AGENTS.md | Wrote the Admin rule and the first-approval-stays-Pending rule into AGENTS.md and the spec scenarios

@@ -1,0 +1,38 @@
+# A: original AGENTS.md
+
+## Plan
+
+1. Domain layer; the rule logic belongs in ApprovalService in ApprovalService.cs. Files to change are that service plus ApprovalServiceTests.cs; if the API payload needs a second approver, ApprovalsController.cs may need the contract update too.
+2. Define explicit reasons such as ManagerLimitExceeded, DirectorLimitExceeded, SecondApproverRequired, SecondApproverMustBeDirector, and SameUserCannotApproveTwice. Return them as a typed result or a domain validation exception with a Reason property/message, and let the controller translate that to a 400/409 response without mutating the invoice.
+3. Admin should not be an unlimited override; it remains a valid approver role only if it maps to the same policy as the underlying approval authority. demo.approver remains the baseline manager-level approver for the <=50,000 path, while demo.admin is the director-level account for testing the higher thresholds.
+4. Guarantee no mutation by validating the entire approval matrix before any change: check amount, role, second approver presence, directorship, and uniqueness. Only after all checks pass do we update Status, DecidedBy, DecidedAt, and DecisionNote; on rejection, we return before calling the repository update.
+5. Write tests for exact boundaries: manager approves at 50,000 exactly; 50,000.01 is rejected; director approves at 500,000 exactly; 500,000.01 requires a second approver; second approver must be distinct and director; same user cannot count twice; and both failure paths return the correct reason. Command: dotnet test backend/InvoiceApp.sln.
+6. Reviewers should verify the approval policy is enforced in the domain service, not in the controller or Program, that no mutation happens on a rejected attempt, that the rejection reasons are clear and consistent, and that the edge values and role combinations are covered by tests before merge.
+
+# B: extended AGENTS.md
+
+## Plan
+
+1. Domain layer, in ApprovalService, with a pure ApprovalPolicy helper in ApprovalService.cs and the domain assembly; the API mapping stays in ApprovalsController.cs, and the behavior is tested in ApprovalServiceTests.cs.
+2. Define reason codes: InvalidState, NotAnApprover, ExceedsApprovalLimit, SameApprover, SecondApproverMustBeDirector, and interim RequiresTwoApprovers; return them as a domain result object with a human-readable message, and let the controller map the result to the existing 400/409 error handling rather than ad hoc exceptions.
+3. Admin remains disallowed from approving; the seeded demo.approver is reclassified as a Manager, and the new seeded users demo.director and demo.director2 are added so the director-only second approval path is valid.
+4. The policy must run before mutation: if role, amount, duplicate-user, or director checks fail, return immediately without changing Status, DecidedBy, DecidedAt, DecisionNote, or the repository state; every rejection test snapshots the invoice before and after the call.
+5. Add xUnit coverage for Manager at 50,000 and 50,000.01, Director at 500,000 and 500,000.01, >500,000 with two distinct approvers, same-user duplication, invalid state, not-an-approver, second-approver-must-be-director, and reason precedence; run them with dotnet test backend/InvoiceApp.sln.
+6. Before merge, the reviewer should confirm the domain logic matches the spec, the rejection path is immutable, reason precedence is correct, seeded roles/users are correct, and every review note has severity, file, line, finding, suggested fix, plus a fixed/dismissed/deferred verdict before approval.
+
+# Comparison
+
+| # | Question | A: original AGENTS.md | B: extended AGENTS.md | Better, and why |
+|---|---|---|---|---|
+| 1 | Layer and files | Puts all rule logic in ApprovalService.cs. Mentions that the controller "may need the contract update if the API payload needs a second approver". | Keeps the rules in the domain layer with a separate pure ApprovalPolicy helper. The controller only maps results, and tests go in ApprovalServiceTests.cs. | B. It follows the layering rule (pure policy, service, controller mapping). A mixes rule logic into the service and assumes a payload that carries a second approver. |
+| 2 | Rejection reasons | Invents its own names (ManagerLimitExceeded, DirectorLimitExceeded, SecondApproverRequired, SameUserCannotApproveTwice). Leaves open whether to use a result object or an exception. | Uses the agreed codes (InvalidState, NotAnApprover, ExceedsApprovalLimit, SameApprover, SecondApproverMustBeDirector, interim RequiresTwoApprovers). Returns a result object and maps it through the existing 400/409 handling. | B. The codes match the spec and AGENTS.md, and it makes one clear choice instead of two. |
+| 3 | Admin and demo.approver | Says Admin is "not an unlimited override" but treats demo.admin as the director-level test account. Says nothing about creating Manager or Director roles. | Admin is not allowed to approve. demo.approver becomes a Manager. New seeded users demo.director and demo.director2 are added for the second-approver path. | B, clearly. A would let Admin approve up to 500,000, which breaks decision D1. |
+| 4 | Nothing changes on rejection | Validates everything before mutating and returns before the repository update. Lists the fields that must not change. | Same ordering (policy before mutation). Also commits to a snapshot of the invoice before and after the call in every rejection test. | B. Both get the structure right. Only B says how the guarantee is proven in tests. |
+| 5 | Tests and command | Boundaries at 50,000, 50,000.01, 500,000 and 500,000.01; distinct director as second approver; same user twice. Command: dotnet test backend/InvoiceApp.sln. | Same boundaries plus InvalidState, NotAnApprover, SecondApproverMustBeDirector and reason precedence. Names xUnit and the same command. | B. It covers more of the rejection paths and the precedence rule. |
+| 6 | What a reviewer checks | Policy is in the domain service, no mutation on rejection, clear and consistent reasons, edge values covered. | Same checks plus reason precedence and seeded roles and users. Each finding has severity, file, line, finding and suggested fix, and gets a fixed, dismissed or deferred verdict. | B. It reuses the review format and verdict rule from AGENTS.md. |
+
+# Conclusion
+
+The original AGENTS.md was already enough for the basics. Both answers put the logic in the domain layer, validate before mutating and cover the four boundary values. The extended file changed four concrete things. First, B used the agreed reason codes and a single result-object design, where A invented its own names. Second, A would have promoted demo.admin to a director-level approver, while B kept Admin out and named the new seeded users. Third, only B commits to a before-and-after snapshot assertion in every rejection test and to testing InvalidState, NotAnApprover and reason precedence. Fourth, only B uses the severity/file/line/fix format with a verdict for every finding.
+
+The extended file did not fix everything. B put ApprovalPolicy inside ApprovalService.cs instead of making it its own type, and neither answer described the first approval leaving the invoice Pending. A even assumed both approvers arrive in one request. Those gaps are why the OpenSpec scenarios (Phase 3) and the plan review before saying "go" (Phase 4) still matter: AGENTS.md sets direction, and the spec and the review catch the details.
