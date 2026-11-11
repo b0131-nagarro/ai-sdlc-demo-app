@@ -77,3 +77,15 @@ or deferred (with reason and issue link).
 ### Git conventions
 - Branch: feature/role-approval-limits. One logical change per commit. The message says what
 changed and why.
+
+## Agents, skills and output format
+- Agents (.github/agents): feature-lead (delegates to subagents), spec-writer, implementer,
+test-writer, reviewer.
+- Skills (.github/skills): approval-rules, write-approval-tests, pr-review, run-mutation-testing.
+- Logging: hooks in .github/hooks append every prompt and tool call to docs/ai-log/ai-interactions.jsonl.
+- Agents never commit. A human reads every diff and commits.
+- Reviews go to docs/reviews/review-<n>.json in the schema defined in the pr-review skill; a hook
+validates the format after every tool call.
+### Output format (all agents)
+End every reply with exactly one line:
+RESULT: <done|blocked> | FILES: <comma-separated paths, or none> | NEXT: <one sentence>
