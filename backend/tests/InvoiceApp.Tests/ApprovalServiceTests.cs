@@ -34,7 +34,7 @@ public class ApprovalServiceTests
     {
         var service = ServiceFor(InvoiceWith("INV-1", InvoiceStatus.PendingApproval));
 
-        var result = service.Approve("INV-1", "demo.approver");
+        var result = service.Approve("INV-1", "demo.approver", "Manager");
 
         Assert.Equal(InvoiceStatus.Approved, result.Status);
         Assert.Equal("demo.approver", result.DecidedBy);
@@ -46,7 +46,7 @@ public class ApprovalServiceTests
     {
         var service = ServiceFor(InvoiceWith("INV-1", InvoiceStatus.Draft));
 
-        Assert.Throws<InvalidOperationException>(() => service.Approve("INV-1", "demo.approver"));
+        Assert.Throws<ApprovalRejectedException>(() => service.Approve("INV-1", "demo.approver", "Manager"));
     }
 
     [Fact]
@@ -54,7 +54,7 @@ public class ApprovalServiceTests
     {
         var service = ServiceFor();
 
-        Assert.Throws<KeyNotFoundException>(() => service.Approve("INV-404", "demo.approver"));
+        Assert.Throws<KeyNotFoundException>(() => service.Approve("INV-404", "demo.approver", "Manager"));
     }
 
     [Fact]

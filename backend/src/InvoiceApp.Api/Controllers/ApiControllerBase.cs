@@ -16,6 +16,15 @@ public abstract class ApiControllerBase : ControllerBase
         {
             return NotFound(new { error = ex.Message });
         }
+        catch (ApprovalRejectedException ex)
+        {
+            if (ex.Reason == ApprovalReason.InvalidState)
+            {
+                return Conflict(new { reason = ex.ReasonCode, error = ex.Message });
+            }
+
+            return BadRequest(new { reason = ex.ReasonCode, error = ex.Message });
+        }
         catch (InvalidOperationException ex)
         {
             return Conflict(new { error = ex.Message });

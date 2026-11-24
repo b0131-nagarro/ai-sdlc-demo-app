@@ -1,11 +1,11 @@
 ## 1.x Phase 1: single-approver limits
-- [ ] Roles and seed users: demo.approver becomes Manager; add Director users; confirm Admin cannot approve.
-- [ ] ApprovalPolicy implements the single-approver limits by role and the rejection reasons.
-- [ ] ApprovalService orchestrates validation and state mutation after the policy accepts.
-- [ ] API error mapping converts approval rejections into existing HTTP/error behavior.
-- [ ] Unit tests T1 to T9 cover the single-approver scenarios and unchanged-invoice assertions.
-- [ ] UI message for rejections is displayed in an alert element.
-- [ ] Interim rule T6: Director approves 500,000.01 and is rejected with RequiresTwoApprovers.
+- [X] Roles and seed users: demo.approver becomes Manager; add Director users; confirm Admin cannot approve.
+- [X] ApprovalPolicy implements the single-approver limits by role and the rejection reasons.
+- [X] ApprovalService orchestrates validation and state mutation after the policy accepts.
+- [X] API error mapping converts approval rejections into existing HTTP/error behavior.
+- [X] Unit tests T1 to T9 cover the single-approver scenarios and unchanged-invoice assertions.
+- [X] UI message for rejections is displayed in an alert element.
+- [X] Interim rule T6: Director approves 500,000.01 and is rejected with RequiresTwoApprovers.
 
 ## 2.x Phase 2: two-approver rule
 - [ ] Approvals list on the invoice records each approver by user id.

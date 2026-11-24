@@ -7,10 +7,12 @@ namespace InvoiceApp.Domain;
 public class ApprovalService
 {
     private readonly IInvoiceRepository _repository;
+    private readonly ApprovalPolicy _policy;
 
     public ApprovalService(IInvoiceRepository repository)
     {
         _repository = repository;
+        _policy = new ApprovalPolicy();
     }
 
     public Invoice Submit(string invoiceId)
@@ -28,13 +30,18 @@ public class ApprovalService
         return invoice;
     }
 
-    public Invoice Approve(string invoiceId, string approver)
+    public Invoice Approve(string invoiceId, string approverUserId, string approverRole)
     {
         var invoice = Find(invoiceId);
-        EnsurePending(invoice);
+        var decision = _policy.Evaluate(invoice, approverUserId, approverRole);
+
+        if (!decision.IsAccepted)
+        {
+            throw new ApprovalRejectedException(decision.Reason!.Value, decision.Message!);
+        }
 
         invoice.Status = InvoiceStatus.Approved;
-        invoice.DecidedBy = approver;
+        invoice.DecidedBy = approverUserId;
         invoice.DecidedAt = DateTime.UtcNow;
         _repository.Update(invoice);
         return invoice;
